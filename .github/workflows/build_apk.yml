@@ -32,7 +32,10 @@ jobs:
 
       - name: Fix project Android config
         run: |
-          cat > android/app/build.gradle << 'APPGRADLE'
+          python3 << 'PY'
+          from pathlib import Path
+
+          Path("android/app/build.gradle").write_text("""\
           plugins {
               id "com.android.application"
               id "kotlin-android"
@@ -73,10 +76,9 @@ jobs:
           }
 
           dependencies {}
-          APPGRADLE
-          sed -i 's/^          //' android/app/build.gradle
+          """.replace("          ", ""), encoding="utf-8")
 
-          cat > android/settings.gradle << 'SETTINGS'
+          Path("android/settings.gradle").write_text("""\
           pluginManagement {
               def flutterSdkPath = {
                   def properties = new Properties()
@@ -102,10 +104,9 @@ jobs:
           }
 
           include ":app"
-          SETTINGS
-          sed -i 's/^          //' android/settings.gradle
+          """.replace("          ", ""), encoding="utf-8")
 
-          cat > android/build.gradle << 'ROOTGRADLE'
+          Path("android/build.gradle").write_text("""\
           allprojects {
               repositories {
                   google()
@@ -124,17 +125,16 @@ jobs:
           tasks.register("clean", Delete) {
               delete rootProject.buildDir
           }
-          ROOTGRADLE
-          sed -i 's/^          //' android/build.gradle
+          """.replace("          ", ""), encoding="utf-8")
 
-          cat > android/gradle.properties << 'PROPS'
-          org.gradle.jvmargs=-Xmx4G -XX:MaxMetaspaceSize=2G -XX:+HeapDumpOnOutOfMemoryError
-          android.useAndroidX=true
-          android.enableJetifier=true
-          PROPS
-          sed -i 's/^          //' android/gradle.properties
-
-          echo "Project Android config fixed."
+          Path("android/gradle.properties").write_text(
+              "org.gradle.jvmargs=-Xmx4G -XX:MaxMetaspaceSize=2G -XX:+HeapDumpOnOutOfMemoryError\\n"
+              "android.useAndroidX=true\\n"
+              "android.enableJetifier=true\\n",
+              encoding="utf-8",
+          )
+          print("Project Android config fixed.")
+          PY
 
       - name: Install dependencies
         run: flutter pub get
