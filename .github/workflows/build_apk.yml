@@ -1,7 +1,7 @@
 name: Build Flutter APK
 
 on:
-  workflow_dispatch: # Manual trigger
+  workflow_dispatch:
   push:
     branches: [ main, master ]
   pull_request:
@@ -27,8 +27,132 @@ jobs:
           channel: 'stable'
           cache: true
 
+      - name: Ensure assets folder exists
+        run: mkdir -p assets/images
+
+      - name: Fix project Android config
+        run: |
+          cat > android/app/build.gradle << 'APPGRADLE'
+          plugins {
+              id "com.android.application"
+              id "kotlin-android"
+              id "dev.flutter.flutter-gradle-plugin"
+          }
+
+          android {
+              namespace = "com.loanagent.app"
+              compileSdk = 35
+              ndkVersion = flutter.ndkVersion
+
+              compileOptions {
+                  sourceCompatibility = JavaVersion.VERSION_17
+                  targetCompatibility = JavaVersion.VERSION_17
+              }
+
+              kotlinOptions {
+                  jvmTarget = "17"
+              }
+
+              defaultConfig {
+                  applicationId = "com.loanagent.app"
+                  minSdk = 23
+                  targetSdk = 35
+                  versionCode = flutter.versionCode
+                  versionName = flutter.versionName
+              }
+
+              buildTypes {
+                  release {
+                      signingConfig = signingConfigs.debug
+                  }
+              }
+          }
+
+          flutter {
+              source = "../.."
+          }
+
+          dependencies {}
+          APPGRADLE
+          sed -i 's/^          //' android/app/build.gradle
+
+          cat > android/settings.gradle << 'SETTINGS'
+          pluginManagement {
+              def flutterSdkPath = {
+                  def properties = new Properties()
+                  file("local.properties").withInputStream { properties.load(it) }
+                  def flutterSdkPath = properties.getProperty("flutter.sdk")
+                  assert flutterSdkPath != null, "flutter.sdk not set in local.properties"
+                  return flutterSdkPath
+              }()
+
+              includeBuild("$flutterSdkPath/packages/flutter_tools/gradle")
+
+              repositories {
+                  google()
+                  mavenCentral()
+                  gradlePluginPortal()
+              }
+          }
+
+          plugins {
+              id "dev.flutter.flutter-plugin-loader" version "1.0.0"
+              id "com.android.application" version "8.3.0" apply false
+              id "org.jetbrains.kotlin.android" version "1.9.22" apply false
+          }
+
+          include ":app"
+          SETTINGS
+          sed -i 's/^          //' android/settings.gradle
+
+          cat > android/build.gradle << 'ROOTGRADLE'
+          allprojects {
+              repositories {
+                  google()
+                  mavenCentral()
+              }
+          }
+
+          rootProject.buildDir = "../build"
+          subprojects {
+              project.buildDir = "${rootProject.buildDir}/${project.name}"
+          }
+          subprojects {
+              project.evaluationDependsOn(":app")
+          }
+
+          tasks.register("clean", Delete) {
+              delete rootProject.buildDir
+          }
+          ROOTGRADLE
+          sed -i 's/^          //' android/build.gradle
+
+          cat > android/gradle.properties << 'PROPS'
+          org.gradle.jvmargs=-Xmx4G -XX:MaxMetaspaceSize=2G -XX:+HeapDumpOnOutOfMemoryError
+          android.useAndroidX=true
+          android.enableJetifier=true
+          PROPS
+          sed -i 's/^          //' android/gradle.properties
+
+          echo "Project Android config fixed."
+
       - name: Install dependencies
         run: flutter pub get
+
+      - name: Patch plugin build.gradle files
+        run: |
+          find "$HOME/.pub-cache" -type f -path "*/android/build.gradle" 2>/dev/null | while read -r f; do
+            if grep -q "flutter\." "$f" 2>/dev/null; then
+              echo "Patching: $f"
+              sed -i \
+                -e 's/flutter\.compileSdkVersion/35/g' \
+                -e 's/flutter\.minSdkVersion/23/g' \
+                -e 's/flutter\.targetSdkVersion/35/g' \
+                -e 's/flutter\.ndkVersion/"27.0.12077973"/g' \
+                "$f" || true
+            fi
+          done
+          echo "Plugin patches applied."
 
       - name: Build APK
         run: flutter build apk --release
