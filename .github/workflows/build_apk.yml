@@ -1,7 +1,11 @@
 name: Build Flutter APK
 
 on:
-  workflow_dispatch: # Allows you to manually trigger the build
+  workflow_dispatch: # Manual trigger
+  push:
+    branches: [ main, master ]
+  pull_request:
+    branches: [ main, master ]
 
 jobs:
   build:
@@ -13,14 +17,15 @@ jobs:
       - name: Set up Java
         uses: actions/setup-java@v4
         with:
-          distribution: 'zulu'
-          java-version: '17' # Matches perfectly with your project's Gradle 8.0 
+          distribution: 'temurin'
+          java-version: '17'
 
       - name: Set up Flutter
         uses: subosito/flutter-action@v2
         with:
-          flutter-version: '3.22.3' # Stable Flutter build environment compatible with Gradle 8.0
+          flutter-version: '3.24.5'
           channel: 'stable'
+          cache: true
 
       - name: Install dependencies
         run: flutter pub get
@@ -33,3 +38,4 @@ jobs:
         with:
           name: release-apk
           path: build/app/outputs/flutter-apk/app-release.apk
+          if-no-files-found: error
