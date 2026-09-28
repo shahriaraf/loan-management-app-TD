@@ -35,105 +35,118 @@ jobs:
           python3 << 'PY'
           from pathlib import Path
 
-          Path("android/app/build.gradle").write_text("""\
-          plugins {
-              id "com.android.application"
-              id "kotlin-android"
-              id "dev.flutter.flutter-gradle-plugin"
-          }
+          def write(path, text):
+              lines = text.splitlines()
+              cleaned = []
+              for line in lines:
+                  if line.startswith("    "):
+                      cleaned.append(line[4:])
+                  else:
+                      cleaned.append(line)
+              Path(path).write_text("\n".join(cleaned).lstrip("\n") + "\n", encoding="utf-8")
+              print(f"Wrote {path}")
 
-          android {
-              namespace = "com.loanagent.app"
-              compileSdk = 35
-              ndkVersion = flutter.ndkVersion
-
-              compileOptions {
-                  sourceCompatibility = JavaVersion.VERSION_17
-                  targetCompatibility = JavaVersion.VERSION_17
+          write("android/app/build.gradle", """
+              plugins {
+                  id "com.android.application"
+                  id "kotlin-android"
+                  id "dev.flutter.flutter-gradle-plugin"
               }
 
-              kotlinOptions {
-                  jvmTarget = "17"
-              }
+              android {
+                  namespace = "com.loanagent.app"
+                  compileSdk = 35
+                  ndkVersion = flutter.ndkVersion
 
-              defaultConfig {
-                  applicationId = "com.loanagent.app"
-                  minSdk = 23
-                  targetSdk = 35
-                  versionCode = flutter.versionCode
-                  versionName = flutter.versionName
-              }
+                  compileOptions {
+                      sourceCompatibility = JavaVersion.VERSION_17
+                      targetCompatibility = JavaVersion.VERSION_17
+                  }
 
-              buildTypes {
-                  release {
-                      signingConfig = signingConfigs.debug
+                  kotlinOptions {
+                      jvmTarget = "17"
+                  }
+
+                  defaultConfig {
+                      applicationId = "com.loanagent.app"
+                      minSdk = 23
+                      targetSdk = 35
+                      versionCode = flutter.versionCode
+                      versionName = flutter.versionName
+                  }
+
+                  buildTypes {
+                      release {
+                          signingConfig = signingConfigs.debug
+                      }
                   }
               }
-          }
 
-          flutter {
-              source = "../.."
-          }
-
-          dependencies {}
-          """.replace("          ", ""), encoding="utf-8")
-
-          Path("android/settings.gradle").write_text("""\
-          pluginManagement {
-              def flutterSdkPath = {
-                  def properties = new Properties()
-                  file("local.properties").withInputStream { properties.load(it) }
-                  def flutterSdkPath = properties.getProperty("flutter.sdk")
-                  assert flutterSdkPath != null, "flutter.sdk not set in local.properties"
-                  return flutterSdkPath
-              }()
-
-              includeBuild("$flutterSdkPath/packages/flutter_tools/gradle")
-
-              repositories {
-                  google()
-                  mavenCentral()
-                  gradlePluginPortal()
+              flutter {
+                  source = "../.."
               }
-          }
 
-          plugins {
-              id "dev.flutter.flutter-plugin-loader" version "1.0.0"
-              id "com.android.application" version "8.3.0" apply false
-              id "org.jetbrains.kotlin.android" version "1.9.22" apply false
-          }
+              dependencies {}
+          """)
 
-          include ":app"
-          """.replace("          ", ""), encoding="utf-8")
+          write("android/settings.gradle", """
+              pluginManagement {
+                  def flutterSdkPath = {
+                      def properties = new Properties()
+                      file("local.properties").withInputStream { properties.load(it) }
+                      def flutterSdkPath = properties.getProperty("flutter.sdk")
+                      assert flutterSdkPath != null, "flutter.sdk not set in local.properties"
+                      return flutterSdkPath
+                  }()
 
-          Path("android/build.gradle").write_text("""\
-          allprojects {
-              repositories {
-                  google()
-                  mavenCentral()
+                  includeBuild("$flutterSdkPath/packages/flutter_tools/gradle")
+
+                  repositories {
+                      google()
+                      mavenCentral()
+                      gradlePluginPortal()
+                  }
               }
-          }
 
-          rootProject.buildDir = "../build"
-          subprojects {
-              project.buildDir = "${rootProject.buildDir}/${project.name}"
-          }
-          subprojects {
-              project.evaluationDependsOn(":app")
-          }
+              plugins {
+                  id "dev.flutter.flutter-plugin-loader" version "1.0.0"
+                  id "com.android.application" version "8.3.0" apply false
+                  id "org.jetbrains.kotlin.android" version "1.9.22" apply false
+              }
 
-          tasks.register("clean", Delete) {
-              delete rootProject.buildDir
-          }
-          """.replace("          ", ""), encoding="utf-8")
+              include ":app"
+          """)
 
-          Path("android/gradle.properties").write_text(
-              "org.gradle.jvmargs=-Xmx4G -XX:MaxMetaspaceSize=2G -XX:+HeapDumpOnOutOfMemoryError\\n"
-              "android.useAndroidX=true\\n"
-              "android.enableJetifier=true\\n",
-              encoding="utf-8",
-          )
+          write("android/build.gradle", """
+              allprojects {
+                  repositories {
+                      google()
+                      mavenCentral()
+                  }
+              }
+
+              rootProject.buildDir = "../build"
+              subprojects {
+                  project.buildDir = "${rootProject.buildDir}/${project.name}"
+              }
+              subprojects {
+                  project.evaluationDependsOn(":app")
+              }
+
+              tasks.register("clean", Delete) {
+                  delete rootProject.buildDir
+              }
+          """)
+
+          write("android/gradle.properties", """
+              org.gradle.jvmargs=-Xmx4G -XX:MaxMetaspaceSize=2G -XX:+HeapDumpOnOutOfMemoryError
+              android.useAndroidX=true
+              android.enableJetifier=true
+          """)
+
           print("Project Android config fixed.")
+          print("--- gradle.properties ---")
+          print(Path("android/gradle.properties").read_text())
           PY
 
       - name: Install dependencies
