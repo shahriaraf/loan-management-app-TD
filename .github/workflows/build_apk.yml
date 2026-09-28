@@ -14,11 +14,12 @@ jobs:
         uses: actions/setup-java@v4
         with:
           distribution: 'zulu'
-          java-version: '21' # Upgraded to resolve the Kotlin/Gradle compilation mismatch
+          java-version: '17' # Matches perfectly with your project's Gradle 8.0 
 
       - name: Set up Flutter
         uses: subosito/flutter-action@v2
         with:
+          flutter-version: '3.22.3' # Stable Flutter build environment compatible with Gradle 8.0
           channel: 'stable'
 
       - name: Install dependencies
